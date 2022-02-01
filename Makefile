@@ -5,7 +5,7 @@ LIBS=$(shell pkg-config --libs libusb-1.0 hidapi-libusb libevdev)
 
 all: sdeck
 
-usbhidtest.o: sdeck.c
+sdeck.o: sdeck.c
 
-usbhidtest: sdeck.o
+sdeck: sdeck.o
 	$(CC) -o sdeck sdeck.o $(LIBS)
