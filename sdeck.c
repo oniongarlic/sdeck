@@ -68,7 +68,11 @@ char img_buffer[8191];
 char img_data[65535];
 
 #define KEY_OFFSET 4
-static int keymap[]={ KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_MUTE, KEY_CUT, KEY_COPY, KEY_PASTE };
+static int keymap[15]={	KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_MUTE, KEY_PLAYPAUSE, KEY_NEXTSONG,
+			KEY_CUT, KEY_COPY, KEY_PASTE, KEY_UNDO, KEY_PROPS,
+			KEY_PAGEUP, KEY_PAGEDOWN, KEY_HOME, KEY_END, KEY_DELETE };
+
+static int keysmax=sizeof(keymap)/sizeof(int);
 
 void sig_handler_sigint(int i)
 {
@@ -206,7 +210,7 @@ dev = libevdev_new();
 libevdev_set_name(dev, "Stream Deck Uinput");
 libevdev_enable_event_type(dev, EV_KEY);
 
-for (i = 0; i < sizeof(keymap)/sizeof(int); i++) {
+for (i = 0; i < keysmax; i++) {
     libevdev_enable_event_code(dev, EV_KEY, keymap[i], NULL);
 }
 
@@ -231,7 +235,7 @@ while (sigint_c==0) {
 	printf("\n");
 
 
-	for (i = 0; i < sizeof(keymap)/sizeof(int); i++) {
+	for (i = 0; i < keysmax; i++) {
     	if (buf[KEY_OFFSET+i]==1) {
     		emit_key(keymap[i]);
     	}
