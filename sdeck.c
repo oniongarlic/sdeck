@@ -1,10 +1,44 @@
+/*
+ *  Stream Deck testing
+ *
+ *  Copyright (C) 2017 Kaj-Michael Lang
+ *  Parts peeked from python libraries
+ *
+ *  This program is free software; you can redistribute it and/or modify
+ *  it under the terms of the GNU General Public License as published by
+ *  the Free Software Foundation; either version 2 of the License, or
+ *  (at your option) any later version.
+ *
+ *  This program is distributed in the hope that it will be useful,
+ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
+ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ *  GNU General Public License for more details.
+ *
+ *  You should have received a copy of the GNU General Public License
+ *  along with this program; if not, write to the Free Software
+ *  Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
+ *
+ */
+
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
+
 #include <hidapi.h>
+#include <linux/input.h>
+#include <libevdev/libevdev-uinput.h>
+
+#define SETSIG(sa, sig, fun, flags) \
+	do { \
+		sa.sa_handler = fun; \
+		sa.sa_flags = flags; \
+		sigemptyset(&sa.sa_mask); \
+		sigaction(sig, &sa, NULL); \
+	} while(0)
 
 #define MAX_STR 255
 
@@ -17,15 +51,29 @@
 #define IMAGE_1 7749
 #define IMAGE_2 7803
 
-int res;
-hid_device *handle;
+static struct sigaction sa_int;
+static int sigint_c=0;
+
+static int res;
+static hid_device *handle;
+
+static int err;
+static struct libevdev *dev;
+static struct libevdev_uinput *uidev;
 
 //                       SE    PR KI
 char img_header[]={ 2, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 char img_extra_v1[]={ 0x42, 0x4d, 0xf6, 0x3c, 0, 0, 0, 0, 0, 0, 0x36, 0, 0, 0, 0x28, 0, 0, 0, 0x48, 0, 0, 0, 0x48, 0, 0, 0, 0x01, 0, 0x18, 0, 0, 0, 0, 0, 0xc0, 0x3c, 0, 0, 0x13, 0x0e, 0, 0, 0x13, 0x0e, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 char img_buffer[8191];
-
 char img_data[65535];
+
+#define KEY_OFFSET 4
+static int keymap[]={ KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_MUTE, KEY_CUT, KEY_COPY, KEY_PASTE };
+
+void sig_handler_sigint(int i)
+{
+sigint_c++;
+}
 
 ssize_t load_img(char *file)
 {
@@ -90,13 +138,9 @@ ssize_t remain;
 pn=0;
 remain=imgsize;
 
-printf("IS=%d\n", remain);
-
 while (remain>0) {
  len=remain<1016 ? remain : 1016;
  sent=pn*1016;
-
- printf("%d %d %d %d\n", len, remain, sent, pn);
 
  img_header[0]=0x02;
  img_header[1]=0x07;
@@ -115,101 +159,90 @@ while (remain>0) {
  memcpy(img_buffer+8, img+sent, len);
 
  r=hid_write(handle, img_buffer, 1024);
- printf("Ir=%d\n", r);
 
  remain=remain-len;
  pn++;
 }
 
-#if 0
-       while bytes_remaining > 0:
-            this_length = min(bytes_remaining, self.IMAGE_REPORT_PAYLOAD_LENGTH)
-            bytes_sent = page_number * self.IMAGE_REPORT_PAYLOAD_LENGTH
-
-            header = [
-                0x02,
-                0x07,
-                key,
-                1 if this_length == bytes_remaining else 0,
-                this_length & 0xFF,
-                this_length >> 8,
-                page_number & 0xFF,
-                page_number >> 8
-            ]
-
-            payload = bytes(header) + image[bytes_sent:bytes_sent + this_length]
-            padding = bytearray(self.IMAGE_REPORT_LENGTH - len(payload))
-            self.device.write(payload + padding)
-
-            bytes_remaining = bytes_remaining - this_length
-            page_number = page_number + 1
-#endif
-
 return r;
+}
+
+void emit_key(unsigned int key)
+{
+printf("KEY=%02x\n", key);
+libevdev_uinput_write_event(uidev, EV_KEY, key, 1);
+libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
+usleep(50);
+libevdev_uinput_write_event(uidev, EV_KEY, key, 0);
+libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
 }
 
 int main(int argc, char* argv[])
 {
-	unsigned char buf[255];
-	int i, il;
+unsigned char buf[255];
+int i, il;
 
-	// Initialize the hidapi library
-	res = hid_init();
+// Initialize the hidapi library
+res = hid_init();
 
-	// Open the device using the VID, PID,
-	// and optionally the Serial number.
-	handle = hid_open(0x0fd9, 0x006d, NULL);
+// Open the device using the VID, PID,
+// and optionally the Serial number.
+handle = hid_open(0x0fd9, 0x006d, NULL);
 
-	if (!handle)
-		return 255;
+if (!handle)
+	return 255;
 
-	printf("%d %d %d\n", sizeof(img_header), sizeof(img_extra_v1), sizeof(img_buffer));
+res=reset_deck();
+printf("RESET=%d\n", res);
 
-	res=reset_deck();
-	printf("RESET=%d\n", res);
+deck_brightness(60);
 
-	sleep(2);
+il=load_img("button.jpg");
+printf("ILs=%d\n", il);
 
-	deck_brightness(100);
+deck_set_image(2, img_data, il);
 
-	sleep(1);
+dev = libevdev_new();
+libevdev_set_name(dev, "Stream Deck Uinput");
+libevdev_enable_event_type(dev, EV_KEY);
 
-	deck_brightness(60);
+for (i = 0; i < sizeof(keymap)/sizeof(int); i++) {
+    libevdev_enable_event_code(dev, EV_KEY, keymap[i], NULL);
+}
 
-	il=load_img("button.jpg");
-	printf("ILs=%d\n", il);
+err = libevdev_uinput_create_from_device(dev, LIBEVDEV_UINPUT_OPEN_MANAGED, &uidev);
+if (err != 0) {
+	printf("uinput fail\n");
+}
 
-	deck_set_image(2, img_data, il);
+SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
 
-//	res=reset_img();
-//	printf("RES=%d\n", res);
+// Read requested state
+while (sigint_c==0) {
+	res=hid_read_timeout(handle, buf, 64, 1500);
 
-#if 0
-	res=set_img(3, 1);
-	printf("RES=%d\n", res);
+	if (res==0)
+		continue;
 
-	res=set_img(3, 2);
-	printf("RES=%d\n", res);
-#endif
-
-	// Read requested state
-	while (1) {
-		memset(buf, 0, 64);
-		res = hid_read_timeout(handle, buf, 64, 1500);
-		printf("RES=%d\n", res);
-
-		// Print out the returned buffer.
-		for (i = 0; i < 64; i++) {
-			printf("%02x ", buf[i]);
-		}
-		printf("\n");
+	// Print out the returned buffer.
+	for (i = 0; i < 24; i++) {
+		printf("%d=%02x, ", i, buf[i]);
 	}
+	printf("\n");
 
-	// Close the device
-	hid_close(handle);
 
-	// Finalize the hidapi library
-	res = hid_exit();
+	for (i = 0; i < sizeof(keymap)/sizeof(int); i++) {
+    	if (buf[KEY_OFFSET+i]==1) {
+    		emit_key(keymap[i]);
+    	}
+    }
+}
 
-	return 0;
+libevdev_uinput_destroy(uidev);
+libevdev_free(dev);
+
+hid_close(handle);
+hid_exit();
+
+return 0;
 }
