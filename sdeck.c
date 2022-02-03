@@ -188,14 +188,38 @@ while (remain>0) {
 return r;
 }
 
-void emit_key(unsigned int key)
+void emit_key(unsigned int type, unsigned int code)
 {
-printf("KEY=%02x\n", key);
-libevdev_uinput_write_event(uidev, EV_KEY, key, 1);
+printf("KEY=%02x\n", code);
+libevdev_uinput_write_event(uidev, type, code, 1);
 libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
-usleep(50);
-libevdev_uinput_write_event(uidev, EV_KEY, key, 0);
+libevdev_uinput_write_event(uidev, type, code, 0);
 libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
+}
+
+void emit_keys(unsigned int type, ...)
+{
+va_list ap;
+unsigned int code;
+
+va_start(ap, type);
+
+do {
+	code=va_arg (ap, int);
+	printf("KEYs=%02x\n", code);
+	libevdev_uinput_write_event(uidev, type, code, 1);
+} while (code>0);
+
+libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
+
+do {
+	code=va_arg (ap, int);
+	libevdev_uinput_write_event(uidev, type, code, 0);
+} while (code>0);
+
+libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
+
+va_end(ap);
 }
 
 int main(int argc, char* argv[])
@@ -217,7 +241,7 @@ if (!handle) {
 
 res=reset_deck();
 
-deck_brightness(60);
+sleep(1);
 
 for (i=0;i<15;i++) {
 	char btn[16];
@@ -228,6 +252,8 @@ for (i=0;i<15;i++) {
 	if (il!=-1) {
 		deck_set_image(14-i, img_data, il);
 	}
+	deck_brightness((100/15)*i);
+	usleep(150*1000); // demo
 }
 
 dev = libevdev_new();
@@ -262,7 +288,7 @@ while (sigint_c==0) {
 
 	for (i = 0; i < keysmax; i++) {
     	if (buf[KEY_OFFSET+i]==1) {
-    		emit_key(keymap[i]);
+    		emit_key(EV_KEY, keymap[i]);
     	}
     }
 }
