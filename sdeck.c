@@ -82,13 +82,30 @@ sigint_c++;
 ssize_t load_img(char *file)
 {
 int f;
-ssize_t r;
+ssize_t r,rl=0;
 
 f=open(file, O_RDONLY);
-r=read(f, img_data, 3528);
+if (f==-1) {
+	perror("Failed to open image!");
+	return -1;
+}
+do {
+	r=read(f, img_data+rl, 1024);
+	printf("R=%d %d\n", r, rl);
+	if (r==-1) {
+		perror("Failed to read image!");
+		break;
+	}
+	rl+=r;
+	if (rl+1024>sizeof(img_data)) {
+		r=-1;
+		break;
+	}
+} while (r>0);
+
 close(f);
 
-return r;
+return r<0 ? r : rl;
 }
 
 int set_img(char key, char part)
@@ -193,18 +210,25 @@ res = hid_init();
 // and optionally the Serial number.
 handle = hid_open(0x0fd9, 0x006d, NULL);
 
-if (!handle)
+if (!handle) {
+	printf("Stream Deck not found\n");
 	return 255;
+}
 
 res=reset_deck();
-printf("RESET=%d\n", res);
 
 deck_brightness(60);
 
-il=load_img("button.jpg");
-printf("ILs=%d\n", il);
+for (i=0;i<15;i++) {
+	char btn[16];
 
-deck_set_image(2, img_data, il);
+	sprintf(btn, "button-%d.jpg", i);
+	il=load_img(btn);
+	printf("Image loaded: %d\n", il);
+	if (il!=-1) {
+		deck_set_image(14-i, img_data, il);
+	}
+}
 
 dev = libevdev_new();
 libevdev_set_name(dev, "Stream Deck Uinput");
@@ -222,6 +246,7 @@ if (err != 0) {
 SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
 
 // Read requested state
+printf("Ready\n");
 while (sigint_c==0) {
 	res=hid_read_timeout(handle, buf, 64, 1500);
 
