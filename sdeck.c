@@ -222,6 +222,10 @@ libevdev_uinput_write_event(uidev, EV_SYN, SYN_REPORT, 0);
 va_end(ap);
 }
 
+void stream_deck_loop(void)
+{
+}
+
 int main(int argc, char* argv[])
 {
 unsigned char buf[255];
@@ -285,12 +289,11 @@ while (sigint_c==0) {
 	}
 	printf("\n");
 
-
 	for (i = 0; i < keysmax; i++) {
-    	if (buf[KEY_OFFSET+i]==1) {
-    		emit_key(EV_KEY, keymap[i]);
-    	}
-    }
+		if (buf[KEY_OFFSET+i]==1) {
+    			emit_key(EV_KEY, keymap[i]);
+		}
+	}
 }
 
 libevdev_uinput_destroy(uidev);
