@@ -1,7 +1,7 @@
 /*
  *  Stream Deck testing
  *
- *  Copyright (C) 2017 Kaj-Michael Lang
+ *  Copyright (C) 2022 Kaj-Michael Lang
  *  Parts peeked from python libraries
  *
  *  This program is free software; you can redistribute it and/or modify
@@ -91,7 +91,7 @@ if (f==-1) {
 }
 do {
 	r=read(f, img_data+rl, 1024);
-	printf("R=%d %d\n", r, rl);
+	printf("R=%ld %ld\n", r, rl);
 	if (r==-1) {
 		perror("Failed to read image!");
 		break;
@@ -160,29 +160,29 @@ pn=0;
 remain=imgsize;
 
 while (remain>0) {
- len=remain<1016 ? remain : 1016;
- sent=pn*1016;
+	len=remain<1016 ? remain : 1016;
+	sent=pn*1016;
 
- img_header[0]=0x02;
- img_header[1]=0x07;
- img_header[2]=key;
+	img_header[0]=0x02;
+	img_header[1]=0x07;
+	img_header[2]=key;
 
- img_header[3]=len==remain ? 1 : 0;
+	img_header[3]=len==remain ? 1 : 0;
 
- img_header[4]=len & 0xff;
- img_header[5]=len >> 8;
+	img_header[4]=len & 0xff;
+	img_header[5]=len >> 8;
 
- img_header[6]=pn & 0xff;
- img_header[7]=pn >> 8;
+	img_header[6]=pn & 0xff;
+	img_header[7]=pn >> 8;
 
- memset(img_buffer, 0, 1024);
- memcpy(img_buffer, img_header, 8);
- memcpy(img_buffer+8, img+sent, len);
+	memset(img_buffer, 0, 1024);
+	memcpy(img_buffer, img_header, 8);
+	memcpy(img_buffer+8, img+sent, len);
 
- r=hid_write(handle, img_buffer, 1024);
+	r=hid_write(handle, img_buffer, 1024);
 
- remain=remain-len;
- pn++;
+	remain=remain-len;
+	pn++;
 }
 
 return r;
@@ -261,7 +261,7 @@ libevdev_set_name(dev, "Stream Deck Uinput");
 libevdev_enable_event_type(dev, EV_KEY);
 
 for (i = 0; i < keysmax; i++) {
-    libevdev_enable_event_code(dev, EV_KEY, keymap[i], NULL);
+	libevdev_enable_event_code(dev, EV_KEY, keymap[i], NULL);
 }
 
 err = libevdev_uinput_create_from_device(dev, LIBEVDEV_UINPUT_OPEN_MANAGED, &uidev);
