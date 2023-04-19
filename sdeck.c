@@ -68,9 +68,23 @@ char img_buffer[8191];
 char img_data[65535];
 
 #define KEY_OFFSET 4
-static int keymap[15]={	KEY_VOLUMEDOWN, KEY_VOLUMEUP, KEY_MUTE, KEY_PLAYPAUSE, KEY_NEXTSONG,
-			KEY_CUT, KEY_COPY, KEY_PASTE, KEY_UNDO, KEY_PROPS,
-			KEY_PAGEUP, KEY_PAGEDOWN, KEY_HOME, KEY_END, KEY_DELETE };
+static int keymap[15]={	KEY_VOLUMEDOWN,
+			KEY_VOLUMEUP,
+			KEY_MUTE,
+			KEY_PLAYPAUSE,
+			KEY_NEXTSONG,
+
+			KEY_CUT,
+			KEY_COPY,
+			KEY_PASTE,
+			KEY_UNDO,
+			KEY_PROPS,
+
+			KEY_PAGEUP,
+			KEY_PAGEDOWN,
+			KEY_HOME,
+			KEY_END,
+			KEY_DELETE};
 
 static int keysmax=sizeof(keymap)/sizeof(int);
 
