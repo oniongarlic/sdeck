@@ -240,10 +240,41 @@ void stream_deck_loop(void)
 {
 }
 
+void set_button_images(void)
+{
+int i,il;
+
+for (i=0;i<15;i++) {
+	char btn[32];
+
+	sprintf(btn, "icons/button-%d.jpg", i);
+	il=load_img(btn);
+	if (il!=-1) {
+		printf("Image[%d] %s loaded: %d\n", i, btn, il);
+		deck_set_image(i, img_data, il);
+	} else {
+		printf("Image[%d] %s failed!\n", i, btn);
+	}
+	deck_brightness((100/15)*i);
+	usleep(15*1000); // demo
+}
+
+}
+
+void dump_key_buffer(unsigned char buf[])
+{
+int i;
+// Print out the returned buffer.
+for (i=0;i<24;i++) {
+	printf("%d=%02x, ", i, buf[i]);
+}
+printf("\n");
+}
+
 int main(int argc, char* argv[])
 {
 unsigned char buf[255];
-int i, il;
+int i;
 
 // Initialize the hidapi library
 res = hid_init();
@@ -260,19 +291,7 @@ if (!handle) {
 res=reset_deck();
 
 sleep(1);
-
-for (i=0;i<15;i++) {
-	char btn[16];
-
-	sprintf(btn, "button-%d.jpg", i);
-	il=load_img(btn);
-	printf("Image loaded: %d\n", il);
-	if (il!=-1) {
-		deck_set_image(14-i, img_data, il);
-	}
-	deck_brightness((100/15)*i);
-	usleep(150*1000); // demo
-}
+set_button_images();
 
 dev = libevdev_new();
 libevdev_set_name(dev, "Stream Deck Uinput");
@@ -285,6 +304,7 @@ for (i = 0; i < keysmax; i++) {
 err = libevdev_uinput_create_from_device(dev, LIBEVDEV_UINPUT_OPEN_MANAGED, &uidev);
 if (err != 0) {
 	printf("uinput fail\n");
+	return 255;
 }
 
 SETSIG(sa_int, SIGINT, sig_handler_sigint, SA_RESTART);
@@ -297,13 +317,9 @@ while (sigint_c==0) {
 	if (res==0)
 		continue;
 
-	// Print out the returned buffer.
-	for (i = 0; i < 24; i++) {
-		printf("%d=%02x, ", i, buf[i]);
-	}
-	printf("\n");
+	//dump_key_buffer(buf);
 
-	for (i = 0; i < keysmax; i++) {
+	for (i=0;i<keysmax;i++) {
 		if (buf[KEY_OFFSET+i]==1) {
     			emit_key(EV_KEY, keymap[i]);
 		}
